@@ -98,6 +98,30 @@ class PostgresQuerySet(models.QuerySet):
 
         return self
 
+    def bulk_insert_simplified(
+        self,
+        rows: List[dict],
+    ):
+        """
+        Backward compatibility with Kolya's version of bulk_insert.
+        """
+        if not self.conflict_target and not self.conflict_action:
+            return len(super().bulk_create(
+                [self.model(**fields) for fields in rows]
+            ))
+
+        if self.conflict_action == ConflictAction.NOTHING:
+            deduped_rows = []
+
+            for row in rows:
+                if row not in deduped_rows:
+                    deduped_rows.append(row)
+        else:
+            deduped_rows = rows
+
+        compiler = self._build_insert_compiler(deduped_rows)
+        return len(compiler.execute_sql(return_id=True))
+
     def bulk_insert(
         self,
         rows: List[dict],
